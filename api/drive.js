@@ -1,9 +1,11 @@
 export default async function handler(req, res) {
-  const { token } = req.query;
+  const authHeader = req.headers.authorization;
 
-  if (!token) {
-    return res.status(400).json({ error: 'Missing token in query' });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
   }
+
+  const token = authHeader.split(' ')[1];
 
   try {
     const driveRes = await fetch('https://www.googleapis.com/drive/v3/files?pageSize=10', {
@@ -24,5 +26,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 
 
