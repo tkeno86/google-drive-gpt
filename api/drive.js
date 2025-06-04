@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const driveRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+    const driveRes = await fetch('https://www.googleapis.com/drive/v3/files?pageSize=10', {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -24,4 +24,5 @@ export default async function handler(req, res) {
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
 
