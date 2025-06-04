@@ -1,6 +1,8 @@
+// /api/auth/login.js
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const REDIRECT_URI = 'https://google-drive-gpt-h5i4.vercel.app/api/auth/callback';
 
+// Scopes to request from the user
 const SCOPES = [
   'https://www.googleapis.com/auth/drive.readonly',
   'https://www.googleapis.com/auth/userinfo.email'
@@ -8,16 +10,19 @@ const SCOPES = [
 
 export default function handler(req, res) {
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+
   authUrl.searchParams.set('client_id', CLIENT_ID);
   authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
-  authUrl.searchParams.set('response_type', 'code');            // ✅ must be 'code'
-  authUrl.searchParams.set('scope', SCOPES.join(' '));          // ✅ must be space-separated
-  authUrl.searchParams.set('access_type', 'offline');           // ✅ enables refresh_token
-  authUrl.searchParams.set('prompt', 'consent');                // ✅ always show consent
-  authUrl.searchParams.set('state', 'gpt-drive-flow');          // optional
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('scope', SCOPES.join(' '));
+  authUrl.searchParams.set('access_type', 'offline'); // so we get refresh_token
+  authUrl.searchParams.set('prompt', 'consent');      // always show approval screen
+  authUrl.searchParams.set('include_granted_scopes', 'true'); // optional
+  authUrl.searchParams.set('state', 'gpt-flow');      // optional state param
 
   res.redirect(authUrl.toString());
 }
+
 
 
 
