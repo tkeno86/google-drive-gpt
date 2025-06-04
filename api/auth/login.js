@@ -12,13 +12,14 @@ export default function handler(req, res) {
 
   authUrl.searchParams.set('client_id', CLIENT_ID);
   authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
-  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('response_type', 'code'); // this ensures /callback gets a "code"
   authUrl.searchParams.set('scope', SCOPES.join(' '));
-  authUrl.searchParams.set('access_type', 'offline'); // request refresh_token
-  authUrl.searchParams.set('prompt', 'consent');      // force approval screen
-  authUrl.searchParams.set('state', 'gpt-drive-flow'); // optional
+  authUrl.searchParams.set('access_type', 'offline'); // needed for refresh_token
+  authUrl.searchParams.set('prompt', 'consent');      // forces scope prompt each time
+  authUrl.searchParams.set('state', 'gpt-drive-flow'); // optional state tracking
 
   res.redirect(authUrl.toString());
 }
+
 
 
