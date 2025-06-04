@@ -12,23 +12,24 @@ export default async function handler(req, res) {
   }
 
   let tokenData;
-
   try {
     tokenData = JSON.parse(tokenRaw);
   } catch (err) {
     return res.status(400).json({ error: 'Invalid token in cookie.' });
   }
 
-  // Attempt Drive API request with access token
-  let driveRes = await fetch('https://www.googleapis.com/drive/v3/files?pageSize=10', {
-    headers: {
-      Authorization: `Bearer ${tokenData.access_token}`
-    }
-  });
+  async function fetchDriveData(accessToken) {
+    const driveRes = await fetch('https://www.googleapis.com/drive/v3/files?pageSize=10', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+    return driveRes.json();
+  }
 
-  let data = await driveRes.json();
+  let data = await fetchDriveData(tokenData.access_token);
 
-  // Token may be expired — try refreshing
+  // 🔁 Token expired, try refresh
   if (data.error?.code === 401 && tokenData.refresh_token) {
     const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -37,16 +38,15 @@ export default async function handler(req, res) {
         client_id: process.env.GOOGLE_CLIENT_ID,
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
         refresh_token: tokenData.refresh_token,
-        grant_type: 'refresh_token',
+        grant_type: 'refresh_token'
       }),
     });
 
-    const refreshed = await refreshRes.json();
+    const newTokens = await refreshRes.json();
 
-    if (refreshed.access_token) {
-      // Update token and cookie
-      tokenData.access_token = refreshed.access_token;
-
+    if (newTokens.access_token) {
+      // 🥠 Update cookie with new access token
+      tokenData.access_token = newTokens.access_token;
       res.setHeader('Set-Cookie', serialize('google_token', JSON.stringify(tokenData), {
         httpOnly: true,
         secure: true,
@@ -55,24 +55,20 @@ export default async function handler(req, res) {
         sameSite: 'lax'
       }));
 
-      // Retry Drive API with new token
-      driveRes = await fetch('https://www.googleapis.com/drive/v3/files?pageSize=10', {
-        headers: {
-          Authorization: `Bearer ${refreshed.access_token}`
-        }
-      });
-
-      data = await driveRes.json();
+      // Retry Drive fetch with new token
+      data = await fetchDriveData(newTokens.access_token);
     } else {
-      return res.status(401).json({
-        error: 'Token refresh failed. Please log in again.',
-        login_url: 'https://google-drive-gpt-h5i4.vercel.app/api/auth/login'
-      });
+      return res.status(401).json({ error: 'Failed to refresh token', details: newTokens });
     }
   }
 
-  return res.status(200).json(data);
+  if (data.error) {
+    return res.status(400).json({ error: 'Drive API error', details: data });
+  }
+
+  res.status(200).json(data);
 }
+
 
 
 
