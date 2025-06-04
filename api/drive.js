@@ -1,22 +1,25 @@
 // /api/drive.js
-import fs from 'fs';
-import path from 'path';
-
-const tokensPath = path.resolve('./tokens.json');
+import { parse, serialize } from 'cookie';
 
 export default async function handler(req, res) {
-  // Check if token file exists
-  if (!fs.existsSync(tokensPath)) {
+  const cookies = parse(req.headers.cookie || '');
+  const tokenRaw = cookies.google_token;
+
+  if (!tokenRaw) {
     return res.status(401).json({
-      error: 'No token found. Please log in first.',
-      login_url: 'https://google-drive-gpt-h5i4.vercel.app/api/auth/login'
+      error: 'Not logged in. Please log in at /api/auth/login.'
     });
   }
 
-  // Load token from file
-  let tokenData = JSON.parse(fs.readFileSync(tokensPath, 'utf-8'));
+  let tokenData;
 
-  // Try Drive API request with existing token
+  try {
+    tokenData = JSON.parse(tokenRaw);
+  } catch (err) {
+    return res.status(400).json({ error: 'Invalid token in cookie.' });
+  }
+
+  // Attempt Drive API request with access token
   let driveRes = await fetch('https://www.googleapis.com/drive/v3/files?pageSize=10', {
     headers: {
       Authorization: `Bearer ${tokenData.access_token}`
@@ -25,7 +28,7 @@ export default async function handler(req, res) {
 
   let data = await driveRes.json();
 
-  // Token might be expired — refresh it
+  // Token may be expired — try refreshing
   if (data.error?.code === 401 && tokenData.refresh_token) {
     const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -41,9 +44,16 @@ export default async function handler(req, res) {
     const refreshed = await refreshRes.json();
 
     if (refreshed.access_token) {
-      // Save updated token to file
+      // Update token and cookie
       tokenData.access_token = refreshed.access_token;
-      fs.writeFileSync(tokensPath, JSON.stringify(tokenData, null, 2));
+
+      res.setHeader('Set-Cookie', serialize('google_token', JSON.stringify(tokenData), {
+        httpOnly: true,
+        secure: true,
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7,
+        sameSite: 'lax'
+      }));
 
       // Retry Drive API with new token
       driveRes = await fetch('https://www.googleapis.com/drive/v3/files?pageSize=10', {
@@ -63,6 +73,7 @@ export default async function handler(req, res) {
 
   return res.status(200).json(data);
 }
+
 
 
 

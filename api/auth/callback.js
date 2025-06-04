@@ -1,8 +1,5 @@
 // /api/auth/callback.js
-import fs from 'fs';
-import path from 'path';
-
-const tokensPath = path.resolve('./tokens.json'); // File location
+import { serialize } from 'cookie';
 
 export default async function handler(req, res) {
   const code = req.query.code;
@@ -11,7 +8,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing authorization code' });
   }
 
-  // Exchange code for tokens
+  // Exchange the code for an access token
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -27,21 +24,23 @@ export default async function handler(req, res) {
   const tokenData = await tokenRes.json();
 
   if (tokenData.access_token) {
-    try {
-      // Write token data to file
-      fs.writeFileSync(tokensPath, JSON.stringify(tokenData, null, 2));
-      console.log('✅ Tokens saved to tokens.json');
-    } catch (err) {
-      console.error('❌ Failed to write tokens.json:', err);
-      return res.status(500).json({ error: 'Failed to save token' });
-    }
+    // ✅ Store token securely in an HTTP-only cookie
+    res.setHeader('Set-Cookie', serialize('google_token', JSON.stringify(tokenData), {
+      httpOnly: true,
+      secure: true,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      sameSite: 'lax'
+    }));
 
-    res.redirect('/'); // Redirect to home or success page
+    // Redirect to home or a success page
+    res.redirect('/');
   } else {
     console.error('❌ Token error:', tokenData);
     res.status(400).json(tokenData);
   }
 }
+
 
 
 
